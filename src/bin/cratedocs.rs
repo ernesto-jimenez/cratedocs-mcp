@@ -5,10 +5,11 @@ use mcp_core::Content;
 use mcp_server::router::RouterService;
 use mcp_server::{ByteTransport, Router, Server};
 use serde_json::json;
+use std::env;
 use std::net::SocketAddr;
 use tokio::io::{stdin, stdout};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use tracing_subscriber::{self, EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{self, EnvFilter};
 
 #[derive(Parser)]
 #[command(author, version = "0.1.0", about, long_about = None)]
@@ -77,6 +78,41 @@ enum Commands {
     },
 }
 
+/// Initialize logging based on environment variables and debug flag
+fn init_logging(log_file_name: &str, debug: bool) -> Result<()> {
+    // Check if logging should be disabled
+    if let Ok(log_level) = env::var("CRATEDOCS_LOG_LEVEL") {
+        if log_level.to_lowercase() == "off" {
+            // Initialize with a no-op subscriber
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::ERROR)
+                .with_writer(std::io::sink)
+                .init();
+            return Ok(());
+        }
+    }
+    
+    // Get log directory from environment or use default
+    let log_dir = env::var("CRATEDOCS_LOG_DIR").unwrap_or_else(|_| "logs".to_string());
+    
+    // Set up file appender for logging
+    let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, log_file_name);
+    
+    // Initialize the tracing subscriber with file logging
+    let level = if debug { tracing::Level::DEBUG } else { tracing::Level::INFO };
+    
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env().add_directive(level.into()))
+        .with_writer(file_appender)
+        .with_target(false)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_line_number(true)
+        .init();
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -109,20 +145,8 @@ async fn main() -> Result<()> {
 }
 
 async fn run_stdio_server(debug: bool) -> Result<()> {
-    // Set up file appender for logging
-    let file_appender = RollingFileAppender::new(Rotation::DAILY, "logs", "stdio-server.log");
-
-    // Initialize the tracing subscriber with file logging
-    let level = if debug { tracing::Level::DEBUG } else { tracing::Level::INFO };
-    
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive(level.into()))
-        .with_writer(file_appender)
-        .with_target(false)
-        .with_thread_ids(true)
-        .with_file(true)
-        .with_line_number(true)
-        .init();
+    // Initialize logging
+    init_logging("stdio-server.log", debug)?;
 
     tracing::info!("Starting MCP documentation server in STDIN/STDOUT mode");
 
@@ -138,16 +162,8 @@ async fn run_stdio_server(debug: bool) -> Result<()> {
 }
 
 async fn run_http_server(address: String, debug: bool) -> Result<()> {
-    // Setup tracing
-    let level = if debug { "debug" } else { "info" };
-    
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("{},{}", level, env!("CARGO_CRATE_NAME")).into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // Initialize logging
+    init_logging("http-server.log", debug)?;
 
     // Parse socket address
     let addr: SocketAddr = address.parse()?;
@@ -213,14 +229,35 @@ async fn run_test_tool(config: TestToolConfig) -> Result<()> {
         return Ok(());
     }
     
-    // Set up console logging
-    let level = if debug { tracing::Level::DEBUG } else { tracing::Level::INFO };
-    
-    tracing_subscriber::fmt()
-        .with_max_level(level)
-        .without_time()
-        .with_target(false)
-        .init();
+    // Initialize logging for test mode
+    // Check if logging should be disabled
+    if let Ok(log_level) = env::var("CRATEDOCS_LOG_LEVEL") {
+        if log_level.to_lowercase() == "off" {
+            // Initialize with a no-op subscriber
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::ERROR)
+                .with_writer(std::io::sink)
+                .init();
+        } else {
+            // Set up console logging for test mode
+            let level = if debug { tracing::Level::DEBUG } else { tracing::Level::INFO };
+            
+            tracing_subscriber::fmt()
+                .with_max_level(level)
+                .without_time()
+                .with_target(false)
+                .init();
+        }
+    } else {
+        // Set up console logging for test mode
+        let level = if debug { tracing::Level::DEBUG } else { tracing::Level::INFO };
+        
+        tracing_subscriber::fmt()
+            .with_max_level(level)
+            .without_time()
+            .with_target(false)
+            .init();
+    }
 
     // Create router instance
     let router = DocRouter::new();

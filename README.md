@@ -137,6 +137,25 @@ Example:
 - It interfaces with docs.rs for crate documentation and crates.io for search functionality
 - Results are returned as plain text/HTML content that can be parsed and presented by the client
 
+## Environment Variables
+
+The following environment variables can be used to configure logging:
+
+- `CRATEDOCS_LOG_DIR`: Specify the directory where log files will be stored (default: `logs`)
+- `CRATEDOCS_LOG_LEVEL`: Set to `off` (case-insensitive) to disable logging entirely
+
+Example usage:
+```bash
+# Change log directory
+CRATEDOCS_LOG_DIR=/var/log/cratedocs cargo run --bin cratedocs stdio
+
+# Disable logging
+CRATEDOCS_LOG_LEVEL=off cargo run --bin cratedocs http
+
+# Combine both
+CRATEDOCS_LOG_DIR=/tmp/logs cargo run --bin cratedocs test --tool lookup_crate --crate-name tokio
+```
+
 ## MCP Protocol Integration
 
 This server implements the Model Context Protocol (MCP) which allows it to be easily integrated with LLM clients that support the protocol. For more information about MCP, visit [the MCP repository](https://github.com/modelcontextprotocol/mcp).

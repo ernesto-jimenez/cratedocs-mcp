@@ -109,6 +109,34 @@ cargo run --bin cratedocs http --address 0.0.0.0:3000
 cargo run --bin cratedocs http --debug
 ```
 
+### Environment Variables
+
+You can configure logging behavior using environment variables:
+
+#### `CRATEDOCS_LOG_DIR`
+Specifies the directory where log files will be stored. Default is `logs`.
+
+```bash
+# Store logs in /var/log/cratedocs
+CRATEDOCS_LOG_DIR=/var/log/cratedocs cargo run --bin cratedocs stdio
+
+# Store logs in a temporary directory
+CRATEDOCS_LOG_DIR=/tmp/cratedocs-logs cargo run --bin cratedocs http
+```
+
+#### `CRATEDOCS_LOG_LEVEL`
+Controls logging behavior. Set to `off` (case-insensitive) to disable logging entirely.
+
+```bash
+# Disable all logging
+CRATEDOCS_LOG_LEVEL=off cargo run --bin cratedocs http
+
+# Run tests without logging
+CRATEDOCS_LOG_LEVEL=off cargo run --bin cratedocs test --tool lookup_crate --crate-name tokio
+```
+
+Note: The `test` command outputs to console by default and only respects `CRATEDOCS_LOG_LEVEL=off` to disable console logging.
+
 ## Example Workflows
 
 ### Helping an LLM Understand a New Crate
